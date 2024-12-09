@@ -1,0 +1,123 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/5/CPU.hdl
+/**
+ * The Hack Central Processing unit (CPU).
+ * Parses the binary code in the instruction input and executes it according to the
+ * Hack machine language specification. In the case of a C-instruction, computes the
+ * function specified by the instruction. If the instruction specifies to read a memory
+ * value, the inM input is expected to contain this value. If the instruction specifies
+ * to write a value to the memory, sets the outM output to this value, sets the addressM
+ * output to the target address, and asserts the writeM output (when writeM = 0, any
+ * value may appear in outM).
+ * If the reset input is 0, computes the address of the next instruction and sets the
+ * pc output to that value. If the reset input is 1, sets pc to 0.
+ * Note: The outM and writeM outputs are combinational: they are affected by the
+ * instruction's execution during the current cycle. The addressM and pc outputs are
+ * clocked: although they are affected by the instruction's execution, they commit to
+ * their new values only in the next cycle.
+ */
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+    And(a=instruction[15], b=instruction[15], out=isC);
+    Not(in=isC, out=isA);
+    And(a=instruction[15], b=instruction[3], out=writeM);
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    Or(a=instruction[5], b=isA, out=loadA);
+
+
+    Mux16(a=instruction, b=aluOut, sel=instruction[15], out=toA);
+    ARegister(in=toA, load=loadA, out=aOut, out[0..14]=addressM);
+    Mux16(a=aOut, b=inM, sel=instruction[12], out=toAlu);
+
+    PC(in=aOut, load=loadPc, inc=true, reset=reset, out[0..14]=pc);
+
+    DRegister(in=toA, load=loadD, out=dOut);
+    ALU(
+        x=dOut, 
+        y=toAlu, 
+        zx=instruction[11], 
+        nx=instruction[10], 
+        zy=instruction[9], 
+        ny=instruction[8], 
+        f=instruction[7], 
+        no=instruction[6], 
+        out=outM, 
+        out=aluOut,
+        zr=zr, 
+        ng=ng
+    );
+
+    // jumpするか？
+    Not(in=zr, out=nZr);
+    Not(in=ng, out=nNg);
+    Not(in=instruction[0], out=nJ1);
+    Not(in=instruction[1], out=nJ2);
+    Not(in=instruction[2], out=nJ3);
+
+    // null 
+    And(a=nJ1 , b=nJ2, out=null1);
+    And(a=null1, b=nJ3, out=null);
+    Not(in=null, out=nNull);
+
+    // JGT 001
+    And(a=instruction[0], b=nJ2, out=gt1);
+    And(a=gt1, b=nJ3, out=gt2);
+    And(a=gt2, b=nNg, out=gt3);
+    And(a=nZr, b=gt3, out=gt);
+
+    // JEQ 010
+    And(a=nJ1, b=nJ3, out=eq1);
+    And(a=instruction[1], b=eq1, out=eq2);
+    And(a=eq2, b=nNg, out=eq3);
+    And(a=zr, b=eq3, out=eq);
+
+    // JGE 011
+    And(a=instruction[0], b=instruction[1], out=ge1);
+    And(a=ge1, b=nJ3, out=ge2);
+    And(a=ge2, b=nNg, out=ge);
+    // Or(a=zr, b=ge3, out=ge);
+
+    // JLT 100
+    And(a=instruction[2], b=nJ2, out=lt1);
+    And(a=lt1, b=nJ1, out=lt2);
+    And(a=nZr, b=lt2, out=lt3);
+    And(a=ng, b=lt3, out=lt);
+
+    // JNE 101
+    And(a=instruction[2], b=nJ2, out=ne1);
+    And(a=instruction[0], b=ne1, out=ne2);
+    And(a=nZr, b=ne2, out=ne);
+ 
+    // JLE 110
+    And(a=instruction[2], b=instruction[1], out=le1);
+    And(a=nJ1, b=le1, out=le2);
+    Or(a=ng, b=zr, out=le3);
+    And(a=le2, b=le3, out=le);
+
+    // JMP 111
+    And(a=instruction[0] , b=instruction[1], out=jmp1);
+    And(a=jmp1 , b=instruction[2], out=jmp);
+
+    Or(a=gt, b=eq, out=j1); 
+    Or(a=j1, b=ge, out=j2);
+    Or(a=j2, b=lt, out=j3);
+    Or(a=j3, b=ne, out=j4);
+    Or(a=j4, b=le, out=j5);
+    Or(a=j5, b=jmp, out=j6);
+    And(a=j6, b=nNull, out=isJmp);
+    And(a=isC, b=isJmp, out=loadPc);
+}
