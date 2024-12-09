@@ -24,7 +24,7 @@ M=1
     //@toBlack
     //D=M
     @i
-    M=0
+    M=1
 
     @KBD
     D=M
