@@ -28,6 +28,15 @@ M=1
 
     @KBD
     D=M
+    // if key input not changed, back to loop
+    @toBlack
+    D=D-M
+    @LOOP
+    D;JEQ
+
+    
+    @KBD
+    D=M
     @toBlack
     M=D
 
