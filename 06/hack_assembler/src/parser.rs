@@ -50,7 +50,8 @@ impl Parser {
     }
 
     fn is_valid(&self) -> bool {
-        !self.codes[self.lineno].is_empty() && !self.codes[self.lineno].starts_with("//")
+        !self.codes[self.lineno].trim().is_empty()
+            && !self.codes[self.lineno].trim().starts_with("//")
     }
 
     pub fn advance(&mut self) {
@@ -61,15 +62,26 @@ impl Parser {
             self.lineno += 1;
         }
         // let line = self.codes[self.lineno].to_owned();
-        let lines: Vec<&str> = self.codes[self.lineno].split("//").collect();
-        let line = lines[0].to_string();
+        let lines: Vec<&str> = self.codes[self.lineno].trim().split("//").collect();
+        let line = lines[0].trim().to_string();
 
         if line.starts_with("(") {
             // Symbolのときのパーサを書く
             self.instruction_type = InstructionType::L_INSTRUCTION;
-            let re = Regex::new(r"(?<=\()<target>[A-Z,0-9]*(?=\))").unwrap();
-            let caps = re.captures(line.as_str()).unwrap();
-            self.symbol = caps.name("target").map_or("", |m| m.as_str()).to_string();
+            let re = Regex::new(r"\(([A-Za-z0-9:.$_]+)\)").unwrap();
+            self.symbol = if let Some(caps) = re.captures(line.as_str()) {
+                if let Some(matched) = caps.get(1) {
+                    matched.as_str()
+                } else {
+                    ""
+                }
+            } else {
+                ""
+            }
+            .to_string();
+            // let caps = re.captures(line.as_str()).unwrap();
+            // eprintln!("{:?}", caps);
+            // self.symbol = caps.name("target").map_or("", |m| m.as_str()).to_string();
         } else if line.starts_with("@") {
             // @のときのパーサを書く
             self.instruction_type = InstructionType::A_INSTRUCTION;

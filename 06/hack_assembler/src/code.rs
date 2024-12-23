@@ -1,11 +1,10 @@
-use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct CodeGen {
     comp: HashMap<String, String>,
     jump: HashMap<String, String>,
     dest: HashMap<String, String>,
-    symbols: HashMap<String, usize>,
 }
 
 impl CodeGen {
@@ -131,14 +130,7 @@ impl CodeGen {
             jump.insert(jump_mnemonic[i].to_owned(), jump_bin[i].to_owned());
         }
 
-        let symbols = HashMap::new();
-
-        let code = CodeGen {
-            comp,
-            dest,
-            jump,
-            symbols,
-        };
+        let code = CodeGen { comp, dest, jump };
         code
     }
 
