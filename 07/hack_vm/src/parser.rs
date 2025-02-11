@@ -1,3 +1,4 @@
+use std::fmt;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
 
@@ -51,10 +52,18 @@ impl Parser {
                 self.arg1 = split_command[1].to_string();
                 self.arg2 = Some(split_command[2].parse::<usize>().unwrap());
             }
-            "add" | "sub" | "neg" | "and" | "or" | "not" => {
+            "add" | "sub" | "neg" | "and" | "or" | "not" | "eq" | "gt" | "lt" => {
                 self.command_type = CommandType::C_ARITHETIC;
+                self.arg1 = split_command[0].to_string();
+                self.arg2 = None;
+            }
+            "" => {
+                self.command_type = CommandType::C_INIT;
+                self.arg1 = String::new();
+                self.arg2 = None;
             }
             _ => {
+                eprintln!("{:?}", split_command);
                 unreachable!()
             }
         }
@@ -78,6 +87,15 @@ impl Parser {
         // }
 
         // if split_command[0] == ""
+    }
+    pub fn command_type(&self) -> CommandType {
+        self.command_type.clone()
+    }
+    pub fn arg1(&self) -> String {
+        self.arg1.clone()
+    }
+    pub fn arg2(&self) -> Option<usize> {
+        self.arg2.clone()
     }
 
     pub fn has_more_lines(&mut self) -> std::io::Result<bool> {
@@ -103,7 +121,8 @@ impl Parser {
     }
 }
 
-enum CommandType {
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum CommandType {
     C_INIT, // 初期値
     C_ARITHETIC,
     C_PUSH,
@@ -116,22 +135,20 @@ enum CommandType {
     C_CALL,
 }
 
-#[derive(Copy, Clone)]
-enum VmAddress {
-    SP = 0,
-    LCL = 1,
-    ARG = 2,
-    THIS = 3,
-    THAT = 4,
-    TEMP = 5,
-    R13 = 13,
-    R14 = 14,
-    R15 = 15,
-}
-
-impl VmAddress {
-    fn as_usize(&self) -> usize {
-        *self as usize
+impl fmt::Display for CommandType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CommandType::C_INIT => write!(f, "C_INIT"),
+            CommandType::C_ARITHETIC => write!(f, "C_ARITHETIC"),
+            CommandType::C_PUSH => write!(f, "C_PUSH"),
+            CommandType::C_POP => write!(f, "C_POP"),
+            CommandType::C_LABEL => write!(f, "C_LABEL"),
+            CommandType::C_GOTO => write!(f, "C_GOTO"),
+            CommandType::C_IF => write!(f, "C_IF"),
+            CommandType::C_FUNCTION => write!(f, "C_FUNCTION"),
+            CommandType::C_RETURN => write!(f, "C_RETURN"),
+            CommandType::C_CALL => write!(f, "C_CALL"),
+        }
     }
 }
 

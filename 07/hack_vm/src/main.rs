@@ -2,14 +2,20 @@ mod code_writer;
 mod parser;
 
 fn main() {
-    let mut parser = parser::Parser::new("src/main.rs").unwrap();
+    // let mut parser = parser::Parser::new("examples/StackTest.vm").unwrap();
+    let mut parser = parser::Parser::new("examples/SimpleSub.vm").unwrap();
     let mut code_writer = code_writer::CodeWriter::new("tmp.txt").unwrap();
     while parser.has_more_lines().unwrap() {
-        parser.advance();
+        // parser.advance();
         // なんかやる
         let line = parser.next_line();
-        // eprintln!("{}", line);
-        code_writer.write_arithmetic(line.as_str());
+        eprintln!("{}", line);
+        if parser.command_type() == parser::CommandType::C_INIT {
+            break;
+        }
+        // code_writer.write_arithmetic(line.as_str());
+        code_writer.write_comment(parser.command_type(), parser.arg1(), parser.arg2());
+        code_writer.write_code(parser.command_type(), parser.arg1(), parser.arg2());
     }
 }
 
