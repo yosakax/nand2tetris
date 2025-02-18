@@ -44,8 +44,8 @@ impl CodeWriter {
             "or" => self.write_or(),
             "not" => self.write_not(),
             "eq" => self.write_eq(),
-            "lt" => self.write_lt(),
-            "gt" => self.write_gt(),
+            // "lt" => self.write_lt(),
+            // "gt" => self.write_gt(),
             _ => {
                 unimplemented!();
             }
@@ -86,264 +86,329 @@ impl CodeWriter {
 
     /// スタックの先頭の値をpopして、segment[index](arg1[arg2])に格納する
     fn write_pop(&mut self, arg1: String, arg2: Option<usize>) {
-        let address = self.get_index(arg1.clone(), arg2.clone());
-        eprintln!("arg1 = {}, index = {}", arg1, address);
-        let address = format!("@{}", address);
-        // データを取ってくる
         self.write_simple_comment("start pop");
-        self.write(vec!["@SP", "M=M-1", "A=M"]);
-        self.write(vec!["D=M", address.as_str(), "M=D"]);
+        self.load_symbol("@SP".to_string());
+        self.load_m("M-1");
+        self.load_a("M");
+        self.load_d("M");
+        self.load_m_from_args(arg1.clone(), arg2.clone());
+        self.load_m("D");
         self.write_simple_comment("end pop");
     }
 
     /// segment[index](arg1[arg2])の値をスタックにpushする
     fn write_push(&mut self, arg1: String, arg2: Option<usize>) {
-        let address = self.get_index(arg1.clone(), arg2.clone());
-        eprintln!("arg1 = {}, index = {}", arg1, address);
-        let address = format!("@{}", address);
-        // データ取ってくる
-        if arg1.as_str() == "constant" {
-            self.write(vec![address.as_str(), "D=A"]);
-        } else {
-            self.write(vec![address.as_str(), "D=M"]);
-        }
-        self.write(vec!["@SP", "A=M", "M=D", "@SP", "M=M+1"]);
+        self.load_d_from_args(arg1.clone(), arg2.clone());
+        self.load_symbol("@SP".to_string());
+        self.load_a("M");
+        self.load_m("D");
+        self.load_symbol("@SP".to_string());
+        self.load_m("M+1");
+        // self.write(vec!["@SP", "A=M", "M=D", "@SP", "M=M+1"]);
     }
 
     // stackから2つ持ってきて足す
     fn write_add(&mut self) {
         self.write_simple_comment("start add");
-        self.write_pop("this".to_string(), None);
-        self.write_pop("that".to_string(), None);
-        let arg1_index = self.get_index("pointer".to_string(), Some(0));
-        let arg2_index = self.get_index("pointer".to_string(), Some(1));
-        let arg1_address = format!("@{}", arg1_index);
-        let arg2_address = format!("@{}", arg2_index);
-        self.write(vec![arg2_address.as_str(), "D=M"]);
-        self.write(vec![arg1_address.as_str(), "M=D+M"]);
-        self.write_push("this".to_string(), None);
+        self.write_pop("temp".to_string(), Some(0));
+        self.write_pop("temp".to_string(), Some(1));
+        self.load_d_from_args("temp".to_string(), Some(0));
+        self.load_m_from_args("temp".to_string(), Some(1));
+        self.load_m("D+M");
+        self.write_push("temp".to_string(), Some(1));
         self.write_simple_comment("end add");
     }
 
     fn write_sub(&mut self) {
         self.write_simple_comment("start sub");
-        self.write_pop("this".to_string(), None);
-        self.write_pop("that".to_string(), None);
-        let arg1_index = self.get_index("pointer".to_string(), Some(0));
-        let arg2_index = self.get_index("pointer".to_string(), Some(1));
-        let arg1_address = format!("@{}", arg1_index);
-        let arg2_address = format!("@{}", arg2_index);
-        self.write(vec![arg2_address.as_str(), "D=M"]);
-        self.write(vec![arg1_address.as_str(), "M=D-M"]);
-        self.write_push("this".to_string(), None);
+        self.write_pop("temp".to_string(), Some(0));
+        self.write_pop("temp".to_string(), Some(1));
+        self.load_d_from_args("temp".to_string(), Some(1));
+        self.load_m_from_args("temp".to_string(), Some(0));
+        self.load_m("D-M");
+        self.write_push("temp".to_string(), Some(0));
         self.write_simple_comment("end sub");
     }
+
     fn write_neg(&mut self) {
         self.write_simple_comment("start neg");
-        self.write_pop("this".to_string(), None);
-        let index = self.get_index("pointer".to_string(), Some(0));
-        let address = format!("@{}", index);
-        // self.write(vec!["@0", "D=A", address.as_str(), "M=D-M"]);
-        self.write(vec![address.as_str(), "M=-M"]);
-        self.write_push("this".to_string(), None);
+        self.write_pop("temp".to_string(), None);
+        self.load_m_from_args("temp".to_string(), None);
+        self.load_m("-M");
+        self.write_push("temp".to_string(), None);
         self.write_simple_comment("end neg");
     }
 
     fn write_and(&mut self) {
         self.write_simple_comment("start and");
-        self.write_pop("this".to_string(), None);
-        self.write_pop("that".to_string(), None);
-        let arg1_index = self.get_index("pointer".to_string(), Some(0));
-        let arg2_index = self.get_index("pointer".to_string(), Some(1));
-        let arg1_address = format!("@{}", arg1_index);
-        let arg2_address = format!("@{}", arg2_index);
-        self.write(vec![arg2_address.as_str(), "D=M"]);
-        self.write(vec![arg1_address.as_str(), "D=D&M", "M=D"]);
-        self.write_push("this".to_string(), None);
+        self.write_pop("temp".to_string(), Some(0));
+        self.write_pop("temp".to_string(), Some(1));
+        self.load_d_from_args("temp".to_string(), Some(1));
+        self.load_m_from_args("temp".to_string(), Some(0));
+        self.load_d("D&M");
+        self.load_m("D");
+        self.write_push("temp".to_string(), Some(0));
         self.write_simple_comment("end and");
     }
 
     fn write_or(&mut self) {
         self.write_simple_comment("start or");
-        self.write_pop("this".to_string(), None);
-        self.write_pop("that".to_string(), None);
-        let arg1_index = self.get_index("pointer".to_string(), Some(0));
-        let arg2_index = self.get_index("pointer".to_string(), Some(1));
-        let arg1_address = format!("@{}", arg1_index);
-        let arg2_address = format!("@{}", arg2_index);
-        self.write(vec![arg2_address.as_str(), "D=M"]);
-        self.write(vec![arg1_address.as_str(), "D=D|M", "M=D"]);
-        self.write_push("this".to_string(), None);
+        self.write_pop("temp".to_string(), Some(0));
+        self.write_pop("temp".to_string(), Some(1));
+        self.load_d_from_args("temp".to_string(), Some(1));
+        self.load_m_from_args("temp".to_string(), Some(0));
+        self.load_d("D|M");
+        self.load_m("D");
+        self.write_push("temp".to_string(), Some(0));
         self.write_simple_comment("end or");
     }
 
     fn write_not(&mut self) {
         self.write_simple_comment("start not");
-        self.write_pop("this".to_string(), None);
-        let index = self.get_index("pointer".to_string(), Some(0));
-        let address = format!("@{}", index);
-        // self.write(vec!["@0", "D=A", address.as_str(), "M=D-M"]);
-        self.write(vec![address.as_str(), "M=!M"]);
-        self.write_push("this".to_string(), None);
+        self.write_pop("temp".to_string(), Some(0));
+        self.load_m_from_args("temp".to_string(), Some(0));
+        self.load_m("!M");
+        self.write_push("temp".to_string(), Some(0));
         self.write_simple_comment("end not");
     }
 
     fn write_eq(&mut self) {
-        self.write_simple_comment("start eq");
-        self.write_pop("this".to_string(), None);
-        self.write_pop("that".to_string(), None);
-        let arg1_index = self.get_index("pointer".to_string(), Some(0));
-        let arg2_index = self.get_index("pointer".to_string(), Some(1));
-        let arg1_address = format!("@{}", arg1_index);
-        let arg2_address = format!("@{}", arg2_index);
-        let label_true = self.get_label_name();
-        let label_false = self.get_label_name();
-        let next_label = self.get_label_name();
-        self.write(vec![arg2_address.as_str(), "D=M"]);
-        self.write(vec![arg1_address.as_str(), "D=D-M"]);
-        self.write(vec![
-            format!("@{}", label_true).as_str(),
-            "D;JEQ",
-            format!("@{}", label_false).as_str(),
-            "0;JMP",
-        ]);
-        self.write(vec![
-            format!("({})", label_true).as_str(),
-            "D=-1",
-            format!("@{}", next_label).as_str(),
-            "0;JMP",
-        ]);
-        self.write(vec![
-            format!("({})", label_false).as_str(),
-            "D=0",
-            format!("@{}", next_label).as_str(),
-            "0;JMP",
-        ]);
-        self.write(vec![
-            format!("({})", next_label).as_str(),
-            arg1_address.as_str(),
-            "M=D",
-        ]);
-        self.write_push("this".to_string(), None);
-        self.write_simple_comment("end eq")
+        unimplemented!();
+        // self.write_simple_comment("start eq");
+        // self.write_pop("temp".to_string(), Some(0));
+        // self.write_pop("temp".to_string(), Some(1));
+        // let arg1_index = self.get_index("temp".to_string(), Some(0));
+        // let arg2_index = self.get_index("temp".to_string(), Some(1));
+        // let arg1_address = format!("@{}", arg1_index);
+        // let arg2_address = format!("@{}", arg2_index);
+        // let label_true = self.get_label_name();
+        // let label_false = self.get_label_name();
+        // let next_label = self.get_label_name();
+        // self.write(vec![arg2_address.as_str(), "D=M"]);
+        // self.write(vec![arg1_address.as_str(), "D=D-M"]);
+        // self.write(vec![
+        //     format!("@{}", label_true).as_str(),
+        //     "D;JEQ",
+        //     format!("@{}", label_false).as_str(),
+        //     "0;JMP",
+        // ]);
+        // self.write(vec![
+        //     format!("({})", label_true).as_str(),
+        //     "D=-1",
+        //     format!("@{}", next_label).as_str(),
+        //     "0;JMP",
+        // ]);
+        // self.write(vec![
+        //     format!("({})", label_false).as_str(),
+        //     "D=0",
+        //     format!("@{}", next_label).as_str(),
+        //     "0;JMP",
+        // ]);
+        // self.write(vec![
+        //     format!("({})", next_label).as_str(),
+        //     arg1_address.as_str(),
+        //     "M=D",
+        // ]);
+        // self.write_push("temp".to_string(), Some(0));
+        // self.write_simple_comment("end eq")
     }
 
-    fn write_lt(&mut self) {
-        self.write_simple_comment("start lt");
-        self.write_pop("this".to_string(), None);
-        self.write_pop("that".to_string(), None);
-        let arg1_index = self.get_index("pointer".to_string(), Some(0));
-        let arg2_index = self.get_index("pointer".to_string(), Some(1));
-        let arg1_address = format!("@{}", arg1_index);
-        let arg2_address = format!("@{}", arg2_index);
-        let label_true = self.get_label_name();
-        let label_false = self.get_label_name();
-        let next_label = self.get_label_name();
-        self.write(vec![arg2_address.as_str(), "D=M"]);
-        self.write(vec![arg1_address.as_str(), "D=D-M"]);
-        self.write(vec![
-            format!("@{}", label_true).as_str(),
-            "D;JLT",
-            format!("@{}", label_false).as_str(),
-            "0;JMP",
-        ]);
-        self.write(vec![
-            format!("({})", label_true).as_str(),
-            "D=-1",
-            format!("@{}", next_label).as_str(),
-            "0;JMP",
-        ]);
-        self.write(vec![
-            format!("({})", label_false).as_str(),
-            "D=0",
-            format!("@{}", next_label).as_str(),
-            "0;JMP",
-        ]);
-        self.write(vec![
-            format!("({})", next_label).as_str(),
-            arg1_address.as_str(),
-            "M=D",
-        ]);
-        self.write_push("this".to_string(), None);
-        self.write_simple_comment("end lt")
+    // fn write_lt(&mut self) {
+    //     self.write_simple_comment("start lt");
+    //     self.write_pop("temp".to_string(), Some(0));
+    //     self.write_pop("temp".to_string(), Some(1));
+    //     let arg1_index = self.get_index("temp".to_string(), Some(0));
+    //     let arg2_index = self.get_index("temp".to_string(), Some(1));
+    //     let arg1_address = format!("@{}", arg1_index);
+    //     let arg2_address = format!("@{}", arg2_index);
+    //     let label_true = self.get_label_name();
+    //     let label_false = self.get_label_name();
+    //     let next_label = self.get_label_name();
+    //     self.write(vec![arg2_address.as_str(), "D=M"]);
+    //     self.write(vec![arg1_address.as_str(), "D=D-M"]);
+    //     self.write(vec![
+    //         format!("@{}", label_true).as_str(),
+    //         "D;JLT",
+    //         format!("@{}", label_false).as_str(),
+    //         "0;JMP",
+    //     ]);
+    //     self.write(vec![
+    //         format!("({})", label_true).as_str(),
+    //         "D=-1",
+    //         format!("@{}", next_label).as_str(),
+    //         "0;JMP",
+    //     ]);
+    //     self.write(vec![
+    //         format!("({})", label_false).as_str(),
+    //         "D=0",
+    //         format!("@{}", next_label).as_str(),
+    //         "0;JMP",
+    //     ]);
+    //     self.write(vec![
+    //         format!("({})", next_label).as_str(),
+    //         arg1_address.as_str(),
+    //         "M=D",
+    //     ]);
+    //     self.write_push("temp".to_string(), Some(0));
+    //     self.write_simple_comment("end lt")
+    // }
+
+    // fn write_gt(&mut self) {
+    //     self.write_simple_comment("start gt");
+    //     self.write_pop("this".to_string(), None);
+    //     self.write_pop("that".to_string(), None);
+    //     let arg1_index = self.get_index("pointer".to_string(), Some(0));
+    //     let arg2_index = self.get_index("pointer".to_string(), Some(1));
+    //     let arg1_address = format!("@{}", arg1_index);
+    //     let arg2_address = format!("@{}", arg2_index);
+    //     let label_true = self.get_label_name();
+    //     let label_false = self.get_label_name();
+    //     let next_label = self.get_label_name();
+    //     self.write(vec![arg2_address.as_str(), "D=M"]);
+    //     self.write(vec![arg1_address.as_str(), "D=D-M"]);
+    //     self.write(vec![
+    //         format!("@{}", label_true).as_str(),
+    //         "D;JGT",
+    //         format!("@{}", label_false).as_str(),
+    //         "0;JMP",
+    //     ]);
+    //     self.write(vec![
+    //         format!("({})", label_true).as_str(),
+    //         "D=-1",
+    //         format!("@{}", next_label).as_str(),
+    //         "0;JMP",
+    //     ]);
+    //     self.write(vec![
+    //         format!("({})", label_false).as_str(),
+    //         "D=0",
+    //         format!("@{}", next_label).as_str(),
+    //         "0;JMP",
+    //     ]);
+    //     self.write(vec![
+    //         format!("({})", next_label).as_str(),
+    //         arg1_address.as_str(),
+    //         "M=D",
+    //     ]);
+    //     self.write_push("temp".to_string(), Some(0));
+    //     self.write_simple_comment("end gt")
+    // }
+
+    fn write(&mut self, command: &str) {
+        self.stream.write_all(command.as_bytes()).unwrap();
+        self.write_line_break();
     }
 
-    fn write_gt(&mut self) {
-        self.write_simple_comment("start gt");
-        self.write_pop("this".to_string(), None);
-        self.write_pop("that".to_string(), None);
-        let arg1_index = self.get_index("pointer".to_string(), Some(0));
-        let arg2_index = self.get_index("pointer".to_string(), Some(1));
-        let arg1_address = format!("@{}", arg1_index);
-        let arg2_address = format!("@{}", arg2_index);
-        let label_true = self.get_label_name();
-        let label_false = self.get_label_name();
-        let next_label = self.get_label_name();
-        self.write(vec![arg2_address.as_str(), "D=M"]);
-        self.write(vec![arg1_address.as_str(), "D=D-M"]);
-        self.write(vec![
-            format!("@{}", label_true).as_str(),
-            "D;JGT",
-            format!("@{}", label_false).as_str(),
-            "0;JMP",
-        ]);
-        self.write(vec![
-            format!("({})", label_true).as_str(),
-            "D=-1",
-            format!("@{}", next_label).as_str(),
-            "0;JMP",
-        ]);
-        self.write(vec![
-            format!("({})", label_false).as_str(),
-            "D=0",
-            format!("@{}", next_label).as_str(),
-            "0;JMP",
-        ]);
-        self.write(vec![
-            format!("({})", next_label).as_str(),
-            arg1_address.as_str(),
-            "M=D",
-        ]);
-        self.write_push("this".to_string(), None);
-        self.write_simple_comment("end gt")
-    }
-
-    fn write(&mut self, commands: Vec<&str>) {
+    fn write_multiple(&mut self, commands: Vec<&str>) {
         let command = commands.join("\n");
         self.stream.write_all(command.as_bytes()).unwrap();
         self.write_line_break();
     }
 
-    fn get_index(&self, arg1: String, arg2: Option<usize>) -> usize {
-        let address = match &*arg1 {
-            "local" | "argument" | "this" | "that" => match &*arg1 {
-                "argument" => VmAddress::ARG.as_usize() + arg2.unwrap_or(0),
-                "local" => VmAddress::LCL.as_usize() + arg2.unwrap_or(0),
-                "this" => VmAddress::THIS.as_usize() + arg2.unwrap_or(0),
-                "that" => VmAddress::THAT.as_usize() + arg2.unwrap_or(0),
-                _ => {
-                    unreachable!();
-                }
-            },
+    fn load_a(&mut self, arg: &str) {
+        self.write(format!("A={}", arg).as_str());
+    }
+    fn load_m(&mut self, arg: &str) {
+        self.write(format!("M={}", arg).as_str());
+    }
+    fn load_d(&mut self, arg: &str) {
+        self.write(format!("D={}", arg).as_str());
+    }
+    fn load_symbol(&mut self, arg: String) {
+        self.write(arg.as_str());
+    }
 
-            "static" => VmAddress::Static.as_usize() + arg2.unwrap_or(0),
-            "constant" => arg2.unwrap_or(0),
-            "pointer" => match arg2.unwrap_or(0) {
-                0 => VmAddress::THIS.as_usize(),
-                1 => VmAddress::THAT.as_usize(),
+    fn load_d_from_args(&mut self, arg1: String, arg2: Option<usize>) {
+        match &*arg1 {
+            "local" | "argument" | "this" | "that" => match &*arg1 {
+                /* 動的にメモリの位置が変更される */
+                "argument" => self
+                    .load_d_from_dynamic_index_value(VmAddress::ARG.as_usize(), arg2.unwrap_or(0)),
+                "local" => self
+                    .load_d_from_dynamic_index_value(VmAddress::LCL.as_usize(), arg2.unwrap_or(0)),
+                "this" => self
+                    .load_d_from_dynamic_index_value(VmAddress::THIS.as_usize(), arg2.unwrap_or(0)),
+                "that" => self
+                    .load_d_from_dynamic_index_value(VmAddress::THAT.as_usize(), arg2.unwrap_or(0)),
                 _ => {
                     unreachable!();
                 }
             },
-            "temp" => VmAddress::TEMP.as_usize() + arg2.unwrap_or(0),
+            "static" => {
+                self.load_d_from_static_index_value(VmAddress::STATIC.as_usize(), arg2.unwrap_or(0))
+            }
+            "constant" => {
+                self.write_multiple(vec![format!("@{}", arg2.unwrap_or(0)).as_str(), "D=A"]);
+            }
+            "pointer" => match arg2.unwrap_or(0) {
+                0 => self.load_d_from_dynamic_index_value(VmAddress::THIS.as_usize(), 0),
+                1 => self.load_d_from_dynamic_index_value(VmAddress::THAT.as_usize(), 0),
+                _ => unreachable!(),
+            },
+            "temp" => {
+                self.load_d_from_static_index_value(VmAddress::TEMP.as_usize(), arg2.unwrap_or(0))
+            }
             _ => {
                 unreachable!();
             }
         };
-        address
     }
 
-    fn get_dynamic_index(&mut self, arg1: String, arg2: Option<usize>) {}
+    fn load_m_from_args(&mut self, arg1: String, arg2: Option<usize>) {
+        match &*arg1 {
+            "local" | "argument" | "this" | "that" => match &*arg1 {
+                /* 動的にメモリの位置が変更される */
+                "argument" => self
+                    .load_m_from_dynamic_index_value(VmAddress::ARG.as_usize(), arg2.unwrap_or(0)),
+                "local" => self
+                    .load_m_from_dynamic_index_value(VmAddress::LCL.as_usize(), arg2.unwrap_or(0)),
+                "this" => self.load_m_from_dynamic_index_value(VmAddress::THIS.as_usize(), 0),
+                "that" => self.load_m_from_dynamic_index_value(VmAddress::THAT.as_usize(), 0),
+                _ => {
+                    unreachable!();
+                }
+            },
+            "static" => {
+                self.load_m_from_static_index_value(VmAddress::STATIC.as_usize(), arg2.unwrap_or(0))
+            }
+            "pointer" => match arg2.unwrap_or(0) {
+                0 => self.load_m_from_dynamic_index_value(VmAddress::THIS.as_usize(), 0),
+                1 => self.load_m_from_dynamic_index_value(VmAddress::THAT.as_usize(), 0),
+                _ => unreachable!(),
+            },
+            "temp" => {
+                self.load_m_from_static_index_value(VmAddress::TEMP.as_usize(), arg2.unwrap_or(0))
+            }
+            _ => {
+                unreachable!();
+            }
+        };
+    }
+
+    /// Dレジスタに指定したアドレスのデータをロードする
+    fn load_d_from_dynamic_index_value(&mut self, base_address: usize, offset: usize) {
+        self.load_m_from_dynamic_index_value(base_address, offset);
+        self.load_d("M");
+    }
+
+    fn load_m_from_dynamic_index_value(&mut self, base_address: usize, offset: usize) {
+        let base_symbol = format!("@{}", base_address);
+        let offset_symbol = format!("@{}", offset);
+        self.load_symbol(offset_symbol);
+        self.load_d("A");
+        self.load_symbol(base_symbol);
+        self.load_a("M+D");
+    }
+
+    /// Dレジスタに指定したアドレスのデータをロードする
+    fn load_d_from_static_index_value(&mut self, base_address: usize, offset: usize) {
+        self.load_m_from_static_index_value(base_address, offset);
+        self.load_d("M");
+    }
+
+    fn load_m_from_static_index_value(&mut self, base_address: usize, offset: usize) {
+        let index_symbol = format!("@{}", base_address + offset);
+        self.load_symbol(index_symbol);
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -370,7 +435,7 @@ enum VmAddress {
     R13 = 13,
     R14 = 14,
     R15 = 15,
-    Static = 16,
+    STATIC = 16,
 }
 
 impl VmAddress {
