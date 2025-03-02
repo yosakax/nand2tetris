@@ -1,5 +1,4 @@
 use crate::parser::CommandType;
-use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
@@ -35,7 +34,7 @@ impl CodeWriter {
         }
     }
 
-    pub fn write_arithmetic(&mut self, command: CommandType, arg1: String) {
+    pub fn write_arithmetic(&mut self, _command: CommandType, arg1: String) {
         match &*arg1 {
             "add" => self.write_add(),
             "sub" => self.write_sub(),
@@ -44,16 +43,13 @@ impl CodeWriter {
             "or" => self.write_or(),
             "not" => self.write_not(),
             "eq" => self.write_eq(),
-            // "lt" => self.write_lt(),
-            // "gt" => self.write_gt(),
+            "lt" => self.write_lt(),
+            "gt" => self.write_gt(),
             _ => {
                 unimplemented!();
             }
         }
     }
-
-    /// 作れって指示あったけど必要か？
-    pub fn write_push_pop(&mut self, command: CommandType, segment: &String, index: usize) {}
 
     pub fn write_comment(&mut self, command: CommandType, arg1: String, arg2: Option<usize>) {
         let comment = format!(
@@ -72,6 +68,7 @@ impl CodeWriter {
         self.write_line_break();
     }
 
+    ///
     fn get_label_name(&mut self) -> String {
         let label_name = format!("L{}", self.label_number);
         self.label_number += 1;
@@ -85,213 +82,229 @@ impl CodeWriter {
     }
 
     /// スタックの先頭の値をpopして、segment[index](arg1[arg2])に格納する
+    ///
+    /// * `arg1`: segment
+    /// * `arg2`: index
     fn write_pop(&mut self, arg1: String, arg2: Option<usize>) {
         self.write_simple_comment("start pop");
-        self.load_symbol("@SP".to_string());
-        self.load_m("M-1");
-        self.load_a("M");
-        self.load_d("M");
+        // ここでMに格納先アドレスが入れる
         self.load_m_from_args(arg1.clone(), arg2.clone());
+        self.load_d("A");
+        self.load_symbol("@15".to_string());
         self.load_m("D");
+
+        // スタックのデータ取り出し
+        self.load_symbol("@SP".to_string());
+        self.load_m("M-1"); // M = M - 1
+        self.load_a("M"); // A = M
+        self.load_d("M"); // D = *SP
+
+        self.load_symbol("@15".to_string());
+        self.load_a("M");
+        self.load_m("D");
+
         self.write_simple_comment("end pop");
     }
 
     /// segment[index](arg1[arg2])の値をスタックにpushする
+    ///
+    /// * `arg1`: segment
+    /// * `arg2`: index
     fn write_push(&mut self, arg1: String, arg2: Option<usize>) {
+        self.write_simple_comment("start push");
         self.load_d_from_args(arg1.clone(), arg2.clone());
+        // self.load_symbol("@15".to_string());
+        // self.load_m("D");
+
         self.load_symbol("@SP".to_string());
         self.load_a("M");
         self.load_m("D");
         self.load_symbol("@SP".to_string());
         self.load_m("M+1");
         // self.write(vec!["@SP", "A=M", "M=D", "@SP", "M=M+1"]);
+        self.write_simple_comment("end push");
     }
 
     // stackから2つ持ってきて足す
     fn write_add(&mut self) {
         self.write_simple_comment("start add");
-        self.write_pop("temp".to_string(), Some(0));
-        self.write_pop("temp".to_string(), Some(1));
-        self.load_d_from_args("temp".to_string(), Some(0));
-        self.load_m_from_args("temp".to_string(), Some(1));
+        self.write_pop("R13".to_string(), Some(0));
+        self.write_pop("R14".to_string(), Some(1));
+        self.load_d_from_args("R13".to_string(), Some(0));
+        self.load_m_from_args("R14".to_string(), Some(1));
         self.load_m("D+M");
-        self.write_push("temp".to_string(), Some(1));
+        self.write_push("R14".to_string(), Some(1));
         self.write_simple_comment("end add");
     }
 
+    /// stackから2つ持ってきて引く
     fn write_sub(&mut self) {
         self.write_simple_comment("start sub");
-        self.write_pop("temp".to_string(), Some(0));
-        self.write_pop("temp".to_string(), Some(1));
-        self.load_d_from_args("temp".to_string(), Some(1));
-        self.load_m_from_args("temp".to_string(), Some(0));
+        self.write_pop("R13".to_string(), Some(0));
+        self.write_pop("R14".to_string(), Some(1));
+        self.load_d_from_args("R14".to_string(), Some(1));
+        self.load_m_from_args("R13".to_string(), Some(0));
         self.load_m("D-M");
-        self.write_push("temp".to_string(), Some(0));
+        self.write_push("R13".to_string(), Some(0));
         self.write_simple_comment("end sub");
     }
 
+    /// stackから1つ持ってきて-1倍する
     fn write_neg(&mut self) {
         self.write_simple_comment("start neg");
-        self.write_pop("temp".to_string(), None);
-        self.load_m_from_args("temp".to_string(), None);
+        self.write_pop("R13".to_string(), None);
+        self.load_m_from_args("R13".to_string(), None);
         self.load_m("-M");
-        self.write_push("temp".to_string(), None);
+        self.write_push("R13".to_string(), None);
         self.write_simple_comment("end neg");
     }
 
+    /// stackから2つ持ってきてandする
     fn write_and(&mut self) {
         self.write_simple_comment("start and");
-        self.write_pop("temp".to_string(), Some(0));
-        self.write_pop("temp".to_string(), Some(1));
-        self.load_d_from_args("temp".to_string(), Some(1));
-        self.load_m_from_args("temp".to_string(), Some(0));
+        self.write_pop("R13".to_string(), Some(0));
+        self.write_pop("R14".to_string(), Some(1));
+        self.load_d_from_args("R14".to_string(), Some(1));
+        self.load_m_from_args("R13".to_string(), Some(0));
         self.load_d("D&M");
         self.load_m("D");
-        self.write_push("temp".to_string(), Some(0));
+        self.write_push("R13".to_string(), Some(0));
         self.write_simple_comment("end and");
     }
 
+    /// stackから2つ持ってきてorを取る
     fn write_or(&mut self) {
         self.write_simple_comment("start or");
-        self.write_pop("temp".to_string(), Some(0));
-        self.write_pop("temp".to_string(), Some(1));
-        self.load_d_from_args("temp".to_string(), Some(1));
-        self.load_m_from_args("temp".to_string(), Some(0));
+        self.write_pop("R13".to_string(), None);
+        self.write_pop("R14".to_string(), None);
+        self.load_d_from_args("R14".to_string(), Some(1));
+        self.load_m_from_args("R13".to_string(), Some(0));
         self.load_d("D|M");
         self.load_m("D");
-        self.write_push("temp".to_string(), Some(0));
+        self.write_push("R13".to_string(), Some(0));
         self.write_simple_comment("end or");
     }
 
+    /// スタックの先頭の値を取り出して、その値を反転してpushする
     fn write_not(&mut self) {
         self.write_simple_comment("start not");
-        self.write_pop("temp".to_string(), Some(0));
-        self.load_m_from_args("temp".to_string(), Some(0));
+        self.write_pop("R13".to_string(), Some(0));
+        self.load_m_from_args("R13".to_string(), Some(0));
         self.load_m("!M");
-        self.write_push("temp".to_string(), Some(0));
+        self.write_push("R13".to_string(), Some(0));
         self.write_simple_comment("end not");
     }
 
+    /// stackから2つ持ってきて等しいかどうかを判定する
+    /// 等しい場合は-1を、そうでない場合は0をpushする
     fn write_eq(&mut self) {
-        unimplemented!();
-        // self.write_simple_comment("start eq");
-        // self.write_pop("temp".to_string(), Some(0));
-        // self.write_pop("temp".to_string(), Some(1));
-        // let arg1_index = self.get_index("temp".to_string(), Some(0));
-        // let arg2_index = self.get_index("temp".to_string(), Some(1));
-        // let arg1_address = format!("@{}", arg1_index);
-        // let arg2_address = format!("@{}", arg2_index);
-        // let label_true = self.get_label_name();
-        // let label_false = self.get_label_name();
-        // let next_label = self.get_label_name();
-        // self.write(vec![arg2_address.as_str(), "D=M"]);
-        // self.write(vec![arg1_address.as_str(), "D=D-M"]);
-        // self.write(vec![
-        //     format!("@{}", label_true).as_str(),
-        //     "D;JEQ",
-        //     format!("@{}", label_false).as_str(),
-        //     "0;JMP",
-        // ]);
-        // self.write(vec![
-        //     format!("({})", label_true).as_str(),
-        //     "D=-1",
-        //     format!("@{}", next_label).as_str(),
-        //     "0;JMP",
-        // ]);
-        // self.write(vec![
-        //     format!("({})", label_false).as_str(),
-        //     "D=0",
-        //     format!("@{}", next_label).as_str(),
-        //     "0;JMP",
-        // ]);
-        // self.write(vec![
-        //     format!("({})", next_label).as_str(),
-        //     arg1_address.as_str(),
-        //     "M=D",
-        // ]);
-        // self.write_push("temp".to_string(), Some(0));
-        // self.write_simple_comment("end eq")
+        self.write_simple_comment("start eq");
+        self.write_pop("R13".to_string(), Some(0));
+        self.write_pop("R14".to_string(), Some(1));
+        let label_true = self.get_label_name();
+        let label_false = self.get_label_name();
+        let next_label = self.get_label_name();
+        self.load_d_from_args("R13".to_string(), Some(0));
+        self.load_m_from_args("R14".to_string(), Some(1));
+        self.load_d("D-M");
+        self.write_multiple(vec![
+            format!("@{}", label_true).as_str(),
+            "D;JEQ",
+            format!("@{}", label_false).as_str(),
+            "0;JMP",
+        ]);
+        self.write_multiple(vec![
+            format!("({})", label_true).as_str(),
+            "D=-1",
+            format!("@{}", next_label).as_str(),
+            "0;JMP",
+        ]);
+        self.write_multiple(vec![
+            format!("({})", label_false).as_str(),
+            "D=0",
+            format!("@{}", next_label).as_str(),
+            "0;JMP",
+        ]);
+        self.write(format!("({})", next_label).as_str());
+        self.write("@13");
+        self.load_m("D");
+        self.write_push("R13".to_string(), Some(0));
+        self.write_simple_comment("end eq")
     }
 
-    // fn write_lt(&mut self) {
-    //     self.write_simple_comment("start lt");
-    //     self.write_pop("temp".to_string(), Some(0));
-    //     self.write_pop("temp".to_string(), Some(1));
-    //     let arg1_index = self.get_index("temp".to_string(), Some(0));
-    //     let arg2_index = self.get_index("temp".to_string(), Some(1));
-    //     let arg1_address = format!("@{}", arg1_index);
-    //     let arg2_address = format!("@{}", arg2_index);
-    //     let label_true = self.get_label_name();
-    //     let label_false = self.get_label_name();
-    //     let next_label = self.get_label_name();
-    //     self.write(vec![arg2_address.as_str(), "D=M"]);
-    //     self.write(vec![arg1_address.as_str(), "D=D-M"]);
-    //     self.write(vec![
-    //         format!("@{}", label_true).as_str(),
-    //         "D;JLT",
-    //         format!("@{}", label_false).as_str(),
-    //         "0;JMP",
-    //     ]);
-    //     self.write(vec![
-    //         format!("({})", label_true).as_str(),
-    //         "D=-1",
-    //         format!("@{}", next_label).as_str(),
-    //         "0;JMP",
-    //     ]);
-    //     self.write(vec![
-    //         format!("({})", label_false).as_str(),
-    //         "D=0",
-    //         format!("@{}", next_label).as_str(),
-    //         "0;JMP",
-    //     ]);
-    //     self.write(vec![
-    //         format!("({})", next_label).as_str(),
-    //         arg1_address.as_str(),
-    //         "M=D",
-    //     ]);
-    //     self.write_push("temp".to_string(), Some(0));
-    //     self.write_simple_comment("end lt")
-    // }
+    /// stackから2つ持ってきて、その大小を比較する (x < y)
+    /// x < y の場合は-1を、そうでない場合は0をpushする
+    fn write_lt(&mut self) {
+        self.write_simple_comment("start lt");
+        self.write_pop("R13".to_string(), Some(0));
+        self.write_pop("R14".to_string(), Some(1));
+        let label_true = self.get_label_name();
+        let label_false = self.get_label_name();
+        let next_label = self.get_label_name();
+        self.load_d_from_args("R14".to_string(), Some(1));
+        self.load_m_from_args("R13".to_string(), Some(0));
+        self.load_d("D-M");
+        self.write_multiple(vec![
+            format!("@{}", label_true).as_str(),
+            "D;JLT",
+            format!("@{}", label_false).as_str(),
+            "0;JMP",
+        ]);
+        self.write_multiple(vec![
+            format!("({})", label_true).as_str(),
+            "D=-1",
+            format!("@{}", next_label).as_str(),
+            "0;JMP",
+        ]);
+        self.write_multiple(vec![
+            format!("({})", label_false).as_str(),
+            "D=0",
+            format!("@{}", next_label).as_str(),
+            "0;JMP",
+        ]);
+        self.write(format!("({})", next_label).as_str());
+        self.write("@13");
+        self.load_m("D");
+        self.write_push("R13".to_string(), Some(0));
+        self.write_simple_comment("end lt")
+    }
 
-    // fn write_gt(&mut self) {
-    //     self.write_simple_comment("start gt");
-    //     self.write_pop("this".to_string(), None);
-    //     self.write_pop("that".to_string(), None);
-    //     let arg1_index = self.get_index("pointer".to_string(), Some(0));
-    //     let arg2_index = self.get_index("pointer".to_string(), Some(1));
-    //     let arg1_address = format!("@{}", arg1_index);
-    //     let arg2_address = format!("@{}", arg2_index);
-    //     let label_true = self.get_label_name();
-    //     let label_false = self.get_label_name();
-    //     let next_label = self.get_label_name();
-    //     self.write(vec![arg2_address.as_str(), "D=M"]);
-    //     self.write(vec![arg1_address.as_str(), "D=D-M"]);
-    //     self.write(vec![
-    //         format!("@{}", label_true).as_str(),
-    //         "D;JGT",
-    //         format!("@{}", label_false).as_str(),
-    //         "0;JMP",
-    //     ]);
-    //     self.write(vec![
-    //         format!("({})", label_true).as_str(),
-    //         "D=-1",
-    //         format!("@{}", next_label).as_str(),
-    //         "0;JMP",
-    //     ]);
-    //     self.write(vec![
-    //         format!("({})", label_false).as_str(),
-    //         "D=0",
-    //         format!("@{}", next_label).as_str(),
-    //         "0;JMP",
-    //     ]);
-    //     self.write(vec![
-    //         format!("({})", next_label).as_str(),
-    //         arg1_address.as_str(),
-    //         "M=D",
-    //     ]);
-    //     self.write_push("temp".to_string(), Some(0));
-    //     self.write_simple_comment("end gt")
-    // }
+    /// stackから2つ持ってきて、その大小を比較する (x > y)
+    /// x > y の場合は-1を、そうでない場合は0をpushする
+    fn write_gt(&mut self) {
+        self.write_simple_comment("start gt");
+        self.write_pop("R13".to_string(), Some(0));
+        self.write_pop("R14".to_string(), Some(1));
+        let label_true = self.get_label_name();
+        let label_false = self.get_label_name();
+        let next_label = self.get_label_name();
+        self.load_d_from_args("R14".to_string(), Some(1));
+        self.load_m_from_args("R13".to_string(), Some(0));
+        self.load_d("D-M");
+        self.write_multiple(vec![
+            format!("@{}", label_true).as_str(),
+            "D;JGT",
+            format!("@{}", label_false).as_str(),
+            "0;JMP",
+        ]);
+        self.write_multiple(vec![
+            format!("({})", label_true).as_str(),
+            "D=-1",
+            format!("@{}", next_label).as_str(),
+            "0;JMP",
+        ]);
+        self.write_multiple(vec![
+            format!("({})", label_false).as_str(),
+            "D=0",
+            format!("@{}", next_label).as_str(),
+            "0;JMP",
+        ]);
+        self.write(format!("({})", next_label).as_str());
+        self.write("@13");
+        self.load_m("D");
+        self.write_push("R13".to_string(), Some(0));
+        self.write_simple_comment("end gt")
+    }
 
     fn write(&mut self, command: &str) {
         self.stream.write_all(command.as_bytes()).unwrap();
@@ -317,6 +330,10 @@ impl CodeWriter {
         self.write(arg.as_str());
     }
 
+    /// Dレジスタに指定したアドレスのデータをロードする
+    ///
+    /// * `arg1`: segment
+    /// * `arg2`: index
     fn load_d_from_args(&mut self, arg1: String, arg2: Option<usize>) {
         match &*arg1 {
             "local" | "argument" | "this" | "that" => match &*arg1 {
@@ -340,19 +357,26 @@ impl CodeWriter {
                 self.write_multiple(vec![format!("@{}", arg2.unwrap_or(0)).as_str(), "D=A"]);
             }
             "pointer" => match arg2.unwrap_or(0) {
-                0 => self.load_d_from_dynamic_index_value(VmAddress::THIS.as_usize(), 0),
-                1 => self.load_d_from_dynamic_index_value(VmAddress::THAT.as_usize(), 0),
+                0 => self.load_d_from_static_index_value(VmAddress::THIS.as_usize(), 0),
+                1 => self.load_d_from_static_index_value(VmAddress::THAT.as_usize(), 0),
                 _ => unreachable!(),
             },
             "temp" => {
                 self.load_d_from_static_index_value(VmAddress::TEMP.as_usize(), arg2.unwrap_or(0))
             }
+            "R13" => self.load_d_from_static_index_value(VmAddress::R13.as_usize(), 0),
+            "R14" => self.load_d_from_static_index_value(VmAddress::R14.as_usize(), 0),
+            "R15" => self.load_d_from_static_index_value(VmAddress::R15.as_usize(), 0),
             _ => {
                 unreachable!();
             }
         };
     }
 
+    /// Mレジスタに指定したアドレスのデータをロードする
+    ///
+    /// * `arg1`: segment
+    /// * `arg2`: index
     fn load_m_from_args(&mut self, arg1: String, arg2: Option<usize>) {
         match &*arg1 {
             "local" | "argument" | "this" | "that" => match &*arg1 {
@@ -361,8 +385,10 @@ impl CodeWriter {
                     .load_m_from_dynamic_index_value(VmAddress::ARG.as_usize(), arg2.unwrap_or(0)),
                 "local" => self
                     .load_m_from_dynamic_index_value(VmAddress::LCL.as_usize(), arg2.unwrap_or(0)),
-                "this" => self.load_m_from_dynamic_index_value(VmAddress::THIS.as_usize(), 0),
-                "that" => self.load_m_from_dynamic_index_value(VmAddress::THAT.as_usize(), 0),
+                "this" => self
+                    .load_m_from_dynamic_index_value(VmAddress::THIS.as_usize(), arg2.unwrap_or(0)),
+                "that" => self
+                    .load_m_from_dynamic_index_value(VmAddress::THAT.as_usize(), arg2.unwrap_or(0)),
                 _ => {
                     unreachable!();
                 }
@@ -371,13 +397,17 @@ impl CodeWriter {
                 self.load_m_from_static_index_value(VmAddress::STATIC.as_usize(), arg2.unwrap_or(0))
             }
             "pointer" => match arg2.unwrap_or(0) {
-                0 => self.load_m_from_dynamic_index_value(VmAddress::THIS.as_usize(), 0),
-                1 => self.load_m_from_dynamic_index_value(VmAddress::THAT.as_usize(), 0),
+                0 => self.load_m_from_static_index_value(VmAddress::THIS.as_usize(), 0),
+                1 => self.load_m_from_static_index_value(VmAddress::THAT.as_usize(), 0),
                 _ => unreachable!(),
             },
             "temp" => {
                 self.load_m_from_static_index_value(VmAddress::TEMP.as_usize(), arg2.unwrap_or(0))
             }
+            "R13" => self.load_m_from_static_index_value(VmAddress::R13.as_usize(), 0),
+            "R14" => self.load_m_from_static_index_value(VmAddress::R14.as_usize(), 0),
+            "R15" => self.load_m_from_static_index_value(VmAddress::R15.as_usize(), 0),
+
             _ => {
                 unreachable!();
             }
@@ -390,13 +420,16 @@ impl CodeWriter {
         self.load_d("M");
     }
 
+    /// Mレジスタに指定したアドレスのデータをロードする
     fn load_m_from_dynamic_index_value(&mut self, base_address: usize, offset: usize) {
+        self.write_simple_comment("start load_m_from_dynamic_index_value");
         let base_symbol = format!("@{}", base_address);
         let offset_symbol = format!("@{}", offset);
-        self.load_symbol(offset_symbol);
-        self.load_d("A");
         self.load_symbol(base_symbol);
-        self.load_a("M+D");
+        self.load_d("M");
+        self.load_symbol(offset_symbol);
+        self.load_a("D+A");
+        self.write_simple_comment("end load_m_from_dynamic_index_value");
     }
 
     /// Dレジスタに指定したアドレスのデータをロードする
@@ -405,6 +438,7 @@ impl CodeWriter {
         self.load_d("M");
     }
 
+    /// Mレジスタに指定したアドレスのデータをロードする
     fn load_m_from_static_index_value(&mut self, base_address: usize, offset: usize) {
         let index_symbol = format!("@{}", base_address + offset);
         self.load_symbol(index_symbol);
@@ -419,19 +453,6 @@ enum VmAddress {
     THIS = 3,
     THAT = 4,
     TEMP = 5,
-    // R0 = 0,
-    // R1 = 1,
-    // R2 = 2,
-    // R3 = 3,
-    // R4 = 4,
-    // R5 = 5,
-    // R6 = 6,
-    // R7 = 7,
-    // R8 = 8,
-    // R9 = 9,
-    // R10 = 10,
-    // R11 = 11,
-    // R12 = 12,
     R13 = 13,
     R14 = 14,
     R15 = 15,
@@ -443,32 +464,4 @@ impl VmAddress {
         *self as usize
     }
 }
-
-#[derive(Copy, Clone)]
-enum MemorySegment {
-    Argument = 400,
-    Local = 300,
-    Pointer = 3,
-    Temp = 5,
-    Constant = 0,
-    Static = 16,
-}
-
-impl MemorySegment {
-    fn as_usize(&self) -> usize {
-        *self as usize
-    }
-}
-
-// impl fmt::Display for MemorySegment {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         match self {
-//             MemorySegment::Local => write!(f, "local"),
-//             MemorySegment::Temp => write!(f, "temp"),
-//             MemorySegment::Pointer => write!(f, "pointer"),
-//             MemorySegment::Constant => write!(f, "constant"),
-//             MemorySegment::Static => write!(f, "static"),
-//         }
-//     }
-// }
 

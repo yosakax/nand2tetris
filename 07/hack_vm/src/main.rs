@@ -8,7 +8,7 @@ fn main() {
     // let mut parser = parser::Parser::new("examples/StackTest.vm").unwrap();
     // let mut parser = parser::Parser::new("examples/SimpleSub.vm").unwrap();
     let mut parser = parser::Parser::new(args[1].as_str()).unwrap();
-    let mut code_writer = code_writer::CodeWriter::new("tmp.txt").unwrap();
+    let mut code_writer = code_writer::CodeWriter::new("tmp.asm").unwrap();
     while parser.has_more_lines().unwrap() {
         // parser.advance();
         // なんかやる
