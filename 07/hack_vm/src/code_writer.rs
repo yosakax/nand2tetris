@@ -121,31 +121,30 @@ impl CodeWriter {
         self.load_m("D");
         self.load_symbol("@SP".to_string());
         self.load_m("M+1");
-        // self.write(vec!["@SP", "A=M", "M=D", "@SP", "M=M+1"]);
         self.write_simple_comment("end push");
     }
 
     // stackから2つ持ってきて足す
     fn write_add(&mut self) {
         self.write_simple_comment("start add");
-        self.write_pop("R13".to_string(), Some(0));
-        self.write_pop("R14".to_string(), Some(1));
-        self.load_d_from_args("R13".to_string(), Some(0));
-        self.load_m_from_args("R14".to_string(), Some(1));
+        self.write_pop("R13".to_string(), None);
+        self.write_pop("R14".to_string(), None);
+        self.load_d_from_args("R13".to_string(), None);
+        self.load_m_from_args("R14".to_string(), None);
         self.load_m("D+M");
-        self.write_push("R14".to_string(), Some(1));
+        self.write_push("R14".to_string(), None);
         self.write_simple_comment("end add");
     }
 
     /// stackから2つ持ってきて引く
     fn write_sub(&mut self) {
         self.write_simple_comment("start sub");
-        self.write_pop("R13".to_string(), Some(0));
-        self.write_pop("R14".to_string(), Some(1));
-        self.load_d_from_args("R14".to_string(), Some(1));
-        self.load_m_from_args("R13".to_string(), Some(0));
+        self.write_pop("R13".to_string(), None);
+        self.write_pop("R14".to_string(), None);
+        self.load_d_from_args("R14".to_string(), None);
+        self.load_m_from_args("R13".to_string(), None);
         self.load_m("D-M");
-        self.write_push("R13".to_string(), Some(0));
+        self.write_push("R13".to_string(), None);
         self.write_simple_comment("end sub");
     }
 
@@ -162,13 +161,13 @@ impl CodeWriter {
     /// stackから2つ持ってきてandする
     fn write_and(&mut self) {
         self.write_simple_comment("start and");
-        self.write_pop("R13".to_string(), Some(0));
-        self.write_pop("R14".to_string(), Some(1));
-        self.load_d_from_args("R14".to_string(), Some(1));
-        self.load_m_from_args("R13".to_string(), Some(0));
+        self.write_pop("R13".to_string(), None);
+        self.write_pop("R14".to_string(), None);
+        self.load_d_from_args("R14".to_string(), None);
+        self.load_m_from_args("R13".to_string(), None);
         self.load_d("D&M");
         self.load_m("D");
-        self.write_push("R13".to_string(), Some(0));
+        self.write_push("R13".to_string(), None);
         self.write_simple_comment("end and");
     }
 
@@ -177,21 +176,21 @@ impl CodeWriter {
         self.write_simple_comment("start or");
         self.write_pop("R13".to_string(), None);
         self.write_pop("R14".to_string(), None);
-        self.load_d_from_args("R14".to_string(), Some(1));
-        self.load_m_from_args("R13".to_string(), Some(0));
+        self.load_d_from_args("R14".to_string(), None);
+        self.load_m_from_args("R13".to_string(), None);
         self.load_d("D|M");
         self.load_m("D");
-        self.write_push("R13".to_string(), Some(0));
+        self.write_push("R13".to_string(), None);
         self.write_simple_comment("end or");
     }
 
     /// スタックの先頭の値を取り出して、その値を反転してpushする
     fn write_not(&mut self) {
         self.write_simple_comment("start not");
-        self.write_pop("R13".to_string(), Some(0));
-        self.load_m_from_args("R13".to_string(), Some(0));
+        self.write_pop("R13".to_string(), None);
+        self.load_m_from_args("R13".to_string(), None);
         self.load_m("!M");
-        self.write_push("R13".to_string(), Some(0));
+        self.write_push("R13".to_string(), None);
         self.write_simple_comment("end not");
     }
 
@@ -199,13 +198,13 @@ impl CodeWriter {
     /// 等しい場合は-1を、そうでない場合は0をpushする
     fn write_eq(&mut self) {
         self.write_simple_comment("start eq");
-        self.write_pop("R13".to_string(), Some(0));
-        self.write_pop("R14".to_string(), Some(1));
+        self.write_pop("R13".to_string(), None);
+        self.write_pop("R14".to_string(), None);
         let label_true = self.get_label_name();
         let label_false = self.get_label_name();
         let next_label = self.get_label_name();
-        self.load_d_from_args("R13".to_string(), Some(0));
-        self.load_m_from_args("R14".to_string(), Some(1));
+        self.load_d_from_args("R13".to_string(), None);
+        self.load_m_from_args("R14".to_string(), None);
         self.load_d("D-M");
         self.write_multiple(vec![
             format!("@{}", label_true).as_str(),
@@ -228,7 +227,7 @@ impl CodeWriter {
         self.write(format!("({})", next_label).as_str());
         self.write("@13");
         self.load_m("D");
-        self.write_push("R13".to_string(), Some(0));
+        self.write_push("R13".to_string(), None);
         self.write_simple_comment("end eq")
     }
 
@@ -236,13 +235,13 @@ impl CodeWriter {
     /// x < y の場合は-1を、そうでない場合は0をpushする
     fn write_lt(&mut self) {
         self.write_simple_comment("start lt");
-        self.write_pop("R13".to_string(), Some(0));
-        self.write_pop("R14".to_string(), Some(1));
+        self.write_pop("R13".to_string(), None);
+        self.write_pop("R14".to_string(), None);
         let label_true = self.get_label_name();
         let label_false = self.get_label_name();
         let next_label = self.get_label_name();
-        self.load_d_from_args("R14".to_string(), Some(1));
-        self.load_m_from_args("R13".to_string(), Some(0));
+        self.load_d_from_args("R14".to_string(), None);
+        self.load_m_from_args("R13".to_string(), None);
         self.load_d("D-M");
         self.write_multiple(vec![
             format!("@{}", label_true).as_str(),
@@ -265,7 +264,7 @@ impl CodeWriter {
         self.write(format!("({})", next_label).as_str());
         self.write("@13");
         self.load_m("D");
-        self.write_push("R13".to_string(), Some(0));
+        self.write_push("R13".to_string(), None);
         self.write_simple_comment("end lt")
     }
 
@@ -273,13 +272,13 @@ impl CodeWriter {
     /// x > y の場合は-1を、そうでない場合は0をpushする
     fn write_gt(&mut self) {
         self.write_simple_comment("start gt");
-        self.write_pop("R13".to_string(), Some(0));
-        self.write_pop("R14".to_string(), Some(1));
+        self.write_pop("R13".to_string(), None);
+        self.write_pop("R14".to_string(), None);
         let label_true = self.get_label_name();
         let label_false = self.get_label_name();
         let next_label = self.get_label_name();
-        self.load_d_from_args("R14".to_string(), Some(1));
-        self.load_m_from_args("R13".to_string(), Some(0));
+        self.load_d_from_args("R14".to_string(), None);
+        self.load_m_from_args("R13".to_string(), None);
         self.load_d("D-M");
         self.write_multiple(vec![
             format!("@{}", label_true).as_str(),
@@ -302,7 +301,7 @@ impl CodeWriter {
         self.write(format!("({})", next_label).as_str());
         self.write("@13");
         self.load_m("D");
-        self.write_push("R13".to_string(), Some(0));
+        self.write_push("R13".to_string(), None);
         self.write_simple_comment("end gt")
     }
 
@@ -447,7 +446,6 @@ impl CodeWriter {
 
 #[derive(Copy, Clone)]
 enum VmAddress {
-    SP = 0,
     LCL = 1,
     ARG = 2,
     THIS = 3,
