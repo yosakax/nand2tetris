@@ -40,7 +40,8 @@ impl Parser {
     }
 
     fn parse_code(&mut self, command: &str) {
-        let split_command: Vec<&str> = command.split(" ").collect();
+        let split_command: Vec<&str> = command.split(" ").map(|x| x.trim()).collect();
+        eprintln!("{:?}", split_command);
         match split_command[0] {
             "push" => {
                 self.command_type = CommandType::C_PUSH;
@@ -57,6 +58,21 @@ impl Parser {
                 self.arg1 = split_command[0].to_string();
                 self.arg2 = None;
             }
+            "label" => {
+                self.command_type = CommandType::C_LABEL;
+                self.arg1 = split_command[1].to_string();
+                self.arg2 = None;
+            }
+            "if-goto" => {
+                self.command_type = CommandType::C_IF;
+                self.arg1 = split_command[1].to_string();
+                self.arg2 = None;
+            }
+            "goto" => {
+                self.command_type = CommandType::C_GOTO;
+                self.arg1 = split_command[1].to_string();
+                self.arg2 = None;
+            }
             "" => {
                 self.command_type = CommandType::C_INIT;
                 self.arg1 = String::new();
@@ -67,26 +83,6 @@ impl Parser {
                 unreachable!()
             }
         }
-        // if split_command[0] == "push" {
-        //     self.command_type = CommandType::C_PUSH;
-        //     self.arg1 = split_command[1].to_string();
-        //     self.arg2 = Some(split_command[2].parse::<usize>().unwrap());
-        // }
-        // else if split_command[0] == "pop" {
-        //     self.command_type = CommandType::C_POP;
-        //     self.arg1 = split_command[1].to_string();
-        //     self.arg2 = Some(split_command[2].parse::<usize>().unwrap());
-        // }
-
-        // if split_command[0] == "add"{
-
-        // }else if split_command[0] == "sub"{
-
-        // }else if split_command[0] == "neg"{
-
-        // }
-
-        // if split_command[0] == ""
     }
     pub fn command_type(&self) -> CommandType {
         self.command_type.clone()

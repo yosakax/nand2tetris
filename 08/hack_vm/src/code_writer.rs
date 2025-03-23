@@ -28,6 +28,15 @@ impl CodeWriter {
             CommandType::C_ARITHETIC => {
                 self.write_arithmetic(command, arg1);
             }
+            CommandType::C_LABEL => {
+                self.write_label(arg1);
+            }
+            CommandType::C_IF => {
+                self.write_if_goto(arg1);
+            }
+            CommandType::C_GOTO => {
+                self.write_goto(arg1);
+            }
             _ => {
                 unreachable!();
             }
@@ -45,10 +54,38 @@ impl CodeWriter {
             "eq" => self.write_eq(),
             "lt" => self.write_lt(),
             "gt" => self.write_gt(),
+            "label" => self.write_label(arg1),
+            "if-goto" => self.write_if_goto(arg1),
+            "goto" => self.write_goto(arg1),
             _ => {
                 unimplemented!();
             }
         }
+    }
+
+    fn write_label(&mut self, label: String) {
+        self.write_simple_comment("start label");
+        self.write(format!("({})", label).as_str());
+        self.write_simple_comment("start label");
+    }
+
+    fn write_if_goto(&mut self, label: String) {
+        self.write_simple_comment("start if-goto");
+        self.load_symbol("@SP".to_string());
+        // 事実上のpop
+        self.load_m("M-1");
+        self.load_a("M");
+        self.load_d("M");
+        self.write(format!("@{}", label).as_str());
+        self.write("D;JGT");
+        self.write_simple_comment("end if-goto");
+    }
+
+    fn write_goto(&mut self, label: String) {
+        self.write_simple_comment("start goto");
+        self.write(format!("@{}", label).as_str());
+        self.write("0;JMP");
+        self.write_simple_comment("end goto");
     }
 
     pub fn write_comment(&mut self, command: CommandType, arg1: String, arg2: Option<usize>) {
