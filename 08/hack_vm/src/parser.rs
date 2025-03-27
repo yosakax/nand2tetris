@@ -34,14 +34,27 @@ impl Parser {
             }
             line = line.trim().to_string();
         }
-        self.parse_code(line.as_str());
+        if !line.is_empty() {
+            self.parse_code(line.as_str());
+        }
 
         return line.clone();
     }
 
     fn parse_code(&mut self, command: &str) {
-        let split_command: Vec<&str> = command.split(" ").map(|x| x.trim()).collect();
+        let split_command: Vec<&str> = command
+            .split(" ")
+            .map(|x| x.trim())
+            .filter(|&x| !x.is_empty())
+            .collect();
         eprintln!("{:?}", split_command);
+        if split_command.is_empty() {
+            eprintln!("HERE");
+            self.command_type = CommandType::C_INIT;
+            self.arg1 = String::new();
+            self.arg2 = None;
+            return;
+        }
         match split_command[0] {
             "push" => {
                 self.command_type = CommandType::C_PUSH;
@@ -73,6 +86,22 @@ impl Parser {
                 self.arg1 = split_command[1].to_string();
                 self.arg2 = None;
             }
+            "function" => {
+                self.command_type = CommandType::C_FUNCTION;
+                self.arg1 = split_command[1].to_string();
+                self.arg2 = Some(split_command[2].parse::<usize>().unwrap());
+            }
+            "return" => {
+                self.command_type = CommandType::C_RETURN;
+                self.arg1 = String::new();
+                self.arg2 = None;
+            }
+            "call" => {
+                self.command_type = CommandType::C_CALL;
+                self.arg1 = split_command[1].to_string();
+                self.arg2 = Some(split_command[2].parse::<usize>().unwrap());
+            }
+
             "" => {
                 self.command_type = CommandType::C_INIT;
                 self.arg1 = String::new();
@@ -118,6 +147,7 @@ impl Parser {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
 pub enum CommandType {
     C_INIT, // 初期値
     C_ARITHETIC,
