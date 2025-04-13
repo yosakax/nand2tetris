@@ -4,17 +4,27 @@ use std::io::{BufWriter, Write};
 
 pub struct CodeWriter {
     pub stream: BufWriter<File>,
+    pub base_name: String,
     label_number: usize,
+    function_name: String,
 }
 
 impl CodeWriter {
     pub fn new(file_path: &str) -> std::io::Result<Self> {
         let file = File::create(file_path)?;
         let stream = BufWriter::new(file);
+        let base_name = String::new();
         return Ok(CodeWriter {
             stream,
+            base_name,
             label_number: 0,
+            function_name: String::new(),
         });
+    }
+
+    pub fn set_base_name(&mut self, file_path: &str) {
+        let base_name = file_path.split('/').next().unwrap().to_string();
+        self.base_name = base_name;
     }
 
     pub fn write_code(&mut self, command: CommandType, arg1: String, arg2: Option<usize>) {
@@ -36,6 +46,15 @@ impl CodeWriter {
             }
             CommandType::C_GOTO => {
                 self.write_goto(arg1);
+            }
+            CommandType::C_FUNCTION => {
+                self.write_function(arg1, arg2);
+            }
+            CommandType::C_RETURN => {
+                self.write_return();
+            }
+            CommandType::C_CALL => {
+                self.write_call(arg1, arg2);
             }
             _ => {
                 unreachable!();
@@ -61,6 +80,95 @@ impl CodeWriter {
                 unimplemented!();
             }
         }
+    }
+
+    /// 関数宣言
+    /// n_varsのローカル変数を0で初期化する
+    ///
+    /// * `function_name`: - 関数の名前
+    /// * `n_vars`: - ローカル変数の数
+    fn write_function(&mut self, function_name: String, n_vars: Option<usize>) {
+        self.write_simple_comment("start function");
+        self.write(format!("({}.{})", self.base_name, function_name).as_str());
+        for i in 0..n_vars.unwrap_or(0) {
+            self.write_push("constant".to_string(), Some(0));
+            self.write_pop("local".to_string(), Some(i));
+        }
+        self.write_simple_comment("end function");
+    }
+
+    fn write_return(&mut self) {
+        self.write_simple_comment("start return");
+        // ARG, SP, THAT, THIS, ARG, LCLを復元
+
+        // ARG
+        self.write_pop("argument".to_string(), None);
+
+        // return アドレスに移動
+
+        self.write_simple_comment("end return");
+    }
+
+    ///  関数呼び出し
+    ///
+    /// * `function_name`: - 関数の名前
+    /// * `n_args`: - stackに積まれている引数の数
+    fn write_call(&mut self, function_name: String, n_args: Option<usize>) {
+        self.write_simple_comment("start call function");
+        /* こんな感じでスタックに積む
+         * push return return address
+         * push LCL
+         * push arg
+         * push this
+         * push that
+         * arg = sp - 5 - nargs
+         * lcl = sp
+         * goto f
+         * (return address)*/
+
+        // リターンアドレスのpush
+        let return_label = self.get_new_return_label();
+        self.write_multiple(vec![format!("@{}", return_label).as_str(), "D=A"]);
+        self.write_push_from_d();
+
+        // localのpush
+        self.load_d_from_args("LCL".to_string(), None);
+        self.write_push_from_d();
+
+        // argumentのpush
+        self.load_d_from_args("ARG".to_string(), None);
+        self.write_push_from_d();
+
+        // THISのpush
+        self.load_d_from_args("THIS".to_string(), None);
+        self.write_push_from_d();
+
+        // THATのpush
+        self.load_d_from_args("THAT".to_string(), None);
+        self.write_push_from_d();
+
+        // ARGの設定
+        self.write_multiple(vec![
+            "@SP",
+            "D=A",
+            "@5",
+            "D=D-A",
+            format!("@{}", n_args.unwrap()).as_str(),
+            "D=D-A",
+            "@ARG",
+            "M=D",
+        ]);
+
+        // LCLの設定
+        self.write_multiple(vec!["@SP", "D=A", "@LCL", "M=D"]);
+
+        // goto function
+        let function_label = format!("{}.{}", self.base_name, function_name);
+        self.write_goto(function_label);
+
+        self.write_label(return_label);
+
+        self.write_simple_comment("end call function");
     }
 
     fn write_label(&mut self, label: String) {
@@ -103,6 +211,12 @@ impl CodeWriter {
         let comment = format!("//{}", comment);
         self.stream.write_all(comment.as_bytes()).unwrap();
         self.write_line_break();
+    }
+
+    // write_callのときのreturn labelを取得する
+    fn get_new_return_label(&mut self) -> String {
+        let return_label = format!("__RETURN__{}", self.get_label_name());
+        return return_label;
     }
 
     ///
@@ -351,6 +465,15 @@ impl CodeWriter {
         let command = commands.join("\n");
         self.stream.write_all(command.as_bytes()).unwrap();
         self.write_line_break();
+    }
+
+    fn write_push_from_d(&mut self) {
+        self.write_simple_comment("start push_from_d");
+        self.write("@SP");
+        self.load_m("M+1");
+        self.write("A=M-1");
+        self.load_m("D");
+        self.write_simple_comment("end push_from_d");
     }
 
     fn load_a(&mut self, arg: &str) {
